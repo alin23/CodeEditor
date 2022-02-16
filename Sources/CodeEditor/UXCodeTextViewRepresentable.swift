@@ -18,7 +18,7 @@ import SwiftUI
  * Move the gritty details out of the main representable.
  */
 struct UXCodeTextViewRepresentable : UXViewRepresentable {
-  
+
   /**
    * Configures a CodeEditor View with the given parameters.
    *
@@ -44,39 +44,42 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
    *   - autoscroll:  If enabled, the editor automatically scrolls to the respective
    *                  region when the `selection` is changed programatically.
    */
-  public init(source      : Binding<String>,
-              selection   : Binding<Range<String.Index>>?,
-              language    : CodeEditor.Language?,
-              theme       : CodeEditor.ThemeName,
-              fontSize    : Binding<CGFloat>?,
-              flags       : CodeEditor.Flags,
-              indentStyle : CodeEditor.IndentStyle,
-              autoPairs   : [ String : String ],
-              inset       : CGSize,
-              autoscroll  : Bool)
+  public init(source          : Binding<String>,
+              selection       : Binding<Range<String.Index>>?,
+              language        : CodeEditor.Language?,
+              theme           : CodeEditor.ThemeName,
+              fontSize        : Binding<CGFloat>?,
+              backgroundColor : Binding<Color>?,
+              flags           : CodeEditor.Flags,
+              indentStyle     : CodeEditor.IndentStyle,
+              autoPairs       : [ String : String ],
+              inset           : CGSize,
+              autoscroll      : Bool)
   {
-    self.source      = source
-    self.selection = selection
-    self.fontSize    = fontSize
-    self.language    = language
-    self.themeName   = theme
-    self.flags       = flags
-    self.indentStyle = indentStyle
-    self.autoPairs   = autoPairs
-    self.inset       = inset
-    self.autoscroll = autoscroll
+    self.source          = source
+    self.selection       = selection
+    self.fontSize        = fontSize
+    self.backgroundColor = backgroundColor
+    self.language        = language
+    self.themeName       = theme
+    self.flags           = flags
+    self.indentStyle     = indentStyle
+    self.autoPairs       = autoPairs
+    self.inset           = inset
+    self.autoscroll      = autoscroll
   }
-    
-  private var source      : Binding<String>
-  private var selection   : Binding<Range<String.Index>>?
-  private var fontSize    : Binding<CGFloat>?
-  private let language    : CodeEditor.Language?
-  private let themeName   : CodeEditor.ThemeName
-  private let flags       : CodeEditor.Flags
-  private let indentStyle : CodeEditor.IndentStyle
-  private let inset       : CGSize
-  private let autoPairs   : [ String : String ]
-  private let autoscroll  : Bool
+
+  private var source          : Binding<String>
+  private var selection       : Binding<Range<String.Index>>?
+  private var fontSize        : Binding<CGFloat>?
+  private var backgroundColor : Binding<Color>?
+  private let language        : CodeEditor.Language?
+  private let themeName       : CodeEditor.ThemeName
+  private let flags           : CodeEditor.Flags
+  private let indentStyle     : CodeEditor.IndentStyle
+  private let inset           : CGSize
+  private let autoPairs       : [ String : String ]
+  private let autoscroll      : Bool
 
   // The inner `value` is true, exactly when execution is inside
   // the `updateTextView(_:)` method. The `Coordinator` can use this
@@ -85,22 +88,31 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
   // might be destructed and recreated in between calls to `makeCoordinator()`
   // and `updateTextView(_:)`.
   @State private var isCurrentlyUpdatingView = ReferenceTypeBool(value: false)
-  
+
   // MARK: - TextView Delegate  Coordinator
-    
+
   public final class Coordinator: NSObject, UXCodeTextViewDelegate {
-    
+
     var parent : UXCodeTextViewRepresentable
-    
+
     var fontSize : CGFloat? {
       set { if let value = newValue { parent.fontSize?.wrappedValue = value } }
       get { parent.fontSize?.wrappedValue }
     }
-    
+
+    var backgroundColor : Color? {
+      set {
+          DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self] in
+              if let value = newValue { self?.parent.backgroundColor?.wrappedValue = value }
+          }
+      }
+      get { parent.backgroundColor?.wrappedValue }
+    }
+
     init(_ parent: UXCodeTextViewRepresentable) {
       self.parent = parent
     }
-    
+
     #if os(macOS)
       public func textDidChange(_ notification: Notification) {
         guard let textView = notification.object as? UXTextView else {
@@ -108,7 +120,7 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
           return
         }
         textViewDidChange(textView: textView)
-      }    
+      }
     #elseif os(iOS)
       public func textViewDidChange(_ textView: UITextView) {
         textViewDidChange(textView: textView)
@@ -116,7 +128,7 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
     #else
       #error("Unsupported OS")
     #endif
-      
+
     private func textViewDidChange(textView: UXTextView) {
       // This function may be called as a consequence of updating the text string
       //  in UXCodeTextViewRepresentable/updateTextView(_:)`.
@@ -126,17 +138,17 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
       guard !parent.isCurrentlyUpdatingView.value else {
         return
       }
-      
+
       parent.source.wrappedValue = textView.string
     }
-      
+
     #if os(macOS)
       public func textViewDidChangeSelection(_ notification: Notification) {
         guard let textView = notification.object as? UXTextView else {
           assertionFailure("unexpected notification object")
           return
         }
-        
+
         textViewDidChangeSelection(textView: textView as! UXCodeTextView)
       }
     #elseif os(iOS)
@@ -146,7 +158,7 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
     #else
       #error("Unsupported OS")
     #endif
-      
+
     private func textViewDidChangeSelection(textView: UXCodeTextView) {
       // This function may be called as a consequence of updating the selected
       // range in UXCodeTextViewRepresentable/updateTextView(_:)`.
@@ -156,34 +168,34 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
       guard !parent.isCurrentlyUpdatingView.value else {
         return
       }
-      
+
       guard let selection = parent.selection else {
         return
       }
 
       let range = textView.swiftSelectedRange
-      
+
       if selection.wrappedValue != range {
         selection.wrappedValue = range
       }
     }
-    
+
     var allowCopy: Bool {
       return parent.flags.contains(.selectable)
           || parent.flags.contains(.editable)
     }
   }
-    
+
   public func makeCoordinator() -> Coordinator {
     return Coordinator(self)
   }
-  
+
   private func updateTextView(_ textView: UXCodeTextView) {
     isCurrentlyUpdatingView.value = true
     defer {
       isCurrentlyUpdatingView.value = false
     }
-      
+
     if let binding = fontSize {
       textView.applyNewTheme(themeName, andFontSize: binding.wrappedValue)
     }
@@ -191,11 +203,11 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
       textView.applyNewTheme(themeName)
     }
     textView.language = language
-    
+
     textView.indentStyle          = indentStyle
     textView.isSmartIndentEnabled = flags.contains(.smartIndent)
     textView.autoPairCompletion   = autoPairs
-        
+
     if source.wrappedValue != textView.string {
       if let textStorage = textView.codeTextStorage {
         textStorage.replaceCharacters(in   : NSMakeRange(0, textStorage.length),
@@ -206,10 +218,10 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
         textView.string = source.wrappedValue
       }
     }
-    
+
     if let selection = selection {
       let range = selection.wrappedValue
-      
+
       if range != textView.swiftSelectedRange {
         let nsrange = NSRange(range, in: textView.string)
         #if os(macOS)
@@ -219,13 +231,13 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
         #else
           #error("Unsupported OS")
         #endif
-        
+
         if autoscroll {
           textView.scrollRangeToVisible(nsrange)
         }
       }
     }
-    
+
     textView.isEditable   = flags.contains(.editable)
     textView.isSelectable = flags.contains(.selectable)
   }
@@ -241,11 +253,11 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
       let scrollView = NSScrollView()
       scrollView.hasVerticalScroller = true
       scrollView.documentView = textView
-      
+
       updateTextView(textView)
       return scrollView
     }
-    
+
     public func updateNSView(_ scrollView: NSScrollView, context: Context) {
       guard let textView = scrollView.documentView as? UXCodeTextView else {
         assertionFailure("unexpected text view")
@@ -272,7 +284,7 @@ struct UXCodeTextViewRepresentable : UXViewRepresentable {
       updateTextView(textView)
       return textView
     }
-    
+
     public func updateUIView(_ textView: UITextView, context: Context) {
       guard let textView = textView as? UXCodeTextView else {
         assertionFailure("unexpected text view")
@@ -292,7 +304,7 @@ extension UXCodeTextViewRepresentable {
   // the wrapped value during `View` renders.
   private class ReferenceTypeBool {
     var value: Bool
-      
+
     init(value: Bool) {
       self.value = value
     }
@@ -300,33 +312,35 @@ extension UXCodeTextViewRepresentable {
 }
 
 struct UXCodeTextViewRepresentable_Previews: PreviewProvider {
-  
+
   static var previews: some View {
-    
-    UXCodeTextViewRepresentable(source      : .constant("let a = 5"),
-                                selection   : nil,
-                                language    : nil,
-                                theme       : .pojoaque,
-                                fontSize    : nil,
-                                flags       : [ .selectable ],
-                                indentStyle : .system,
-                                autoPairs   : [:],
-                                inset       : .init(width: 8, height: 8),
-                                autoscroll  : false)
+
+    UXCodeTextViewRepresentable(source          : .constant("let a = 5"),
+                                selection       : nil,
+                                language        : nil,
+                                theme           : .pojoaque,
+                                fontSize        : nil,
+                                backgroundColor : nil,
+                                flags           : [ .selectable ],
+                                indentStyle     : .system,
+                                autoPairs       : [:],
+                                inset           : .init(width: 8, height: 8),
+                                autoscroll      : false)
       .frame(width: 200, height: 100)
-    
+
     UXCodeTextViewRepresentable(source: .constant("let a = 5"),
-                                selection   : nil,
-                                language    : .swift,
-                                theme       : .pojoaque,
-                                fontSize    : nil,
-                                flags       : [ .selectable ],
-                                indentStyle : .system,
-                                autoPairs   : [:],
-                                inset       : .init(width: 8, height: 8),
-                                autoscroll  : false)
+                                selection       : nil,
+                                language        : .swift,
+                                theme           : .pojoaque,
+                                fontSize        : nil,
+                                backgroundColor : nil,
+                                flags           : [ .selectable ],
+                                indentStyle     : .system,
+                                autoPairs       : [:],
+                                inset           : .init(width: 8, height: 8),
+                                autoscroll      : false)
       .frame(width: 200, height: 100)
-    
+
     UXCodeTextViewRepresentable(
       source: .constant(
         #"""
@@ -334,15 +348,16 @@ struct UXCodeTextViewRepresentable_Previews: PreviewProvider {
         \bye
         """#
       ),
-      selection   : nil,
-      language    : .tex,
-      theme       : .pojoaque,
-      fontSize    : nil,
-      flags       : [ .selectable ],
-      indentStyle : .system,
-      autoPairs   : [:],
-      inset       : .init(width: 8, height: 8),
-      autoscroll  : false
+      selection       : nil,
+      language        : .tex,
+      theme           : .pojoaque,
+      fontSize        : nil,
+      backgroundColor : nil,
+      flags           : [ .selectable ],
+      indentStyle     : .system,
+      autoPairs       : [:],
+      inset           : .init(width: 8, height: 8),
+      autoscroll      : false
     )
     .frame(width: 540, height: 200)
   }

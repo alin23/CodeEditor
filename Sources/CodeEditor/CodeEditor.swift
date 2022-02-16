@@ -229,28 +229,30 @@ public struct CodeEditor: View {
    *   - autoscroll:  If enabled, the editor automatically scrolls to the respective
    *                  region when the `selection` is changed programatically.
    */
-  public init(source      : Binding<String>,
-              selection   : Binding<Range<String.Index>>? = nil,
-              language    : Language?            = nil,
-              theme       : ThemeName            = .default,
-              fontSize    : Binding<CGFloat>?    = nil,
-              flags       : Flags                = .defaultEditorFlags,
-              indentStyle : IndentStyle          = .system,
-              autoPairs   : [ String : String ]? = nil,
-              inset       : CGSize?              = nil,
-              autoscroll  : Bool                 = true)
+  public init(source          : Binding<String>,
+              selection       : Binding<Range<String.Index>>? = nil,
+              language        : Language?            = nil,
+              theme           : ThemeName            = .default,
+              fontSize        : Binding<CGFloat>?    = nil,
+              backgroundColor : Binding<Color>?      = nil,
+              flags           : Flags                = .defaultEditorFlags,
+              indentStyle     : IndentStyle          = .system,
+              autoPairs       : [ String : String ]? = nil,
+              inset           : CGSize?              = nil,
+              autoscroll      : Bool                 = true)
   {
-    self.source      = source
-    self.selection   = selection
-    self.fontSize    = fontSize
-    self.language    = language
-    self.themeName   = theme
-    self.flags       = flags
-    self.indentStyle = indentStyle
-    self.inset       = inset ?? CGSize(width: 8, height: 8)
-    self.autoPairs   = autoPairs
-                    ?? language.flatMap({ CodeEditor.defaultAutoPairs[$0] })
-                    ?? [:]
+    self.source           = source
+    self.selection        = selection
+    self.fontSize         = fontSize
+    self.backgroundColor  = backgroundColor
+    self.language         = language
+    self.themeName        = theme
+    self.flags            = flags
+    self.indentStyle      = indentStyle
+    self.inset            = inset ?? CGSize(width: 8, height: 8)
+    self.autoPairs        = autoPairs
+                         ?? language.flatMap({ CodeEditor.defaultAutoPairs[$0] })
+                         ?? [:]
     self.autoscroll = autoscroll
   }
   
@@ -279,48 +281,52 @@ public struct CodeEditor: View {
    *                  8/8.
    */
   @inlinable
-  public init(source      : String,
-              language    : Language?            = nil,
-              theme       : ThemeName            = .default,
-              fontSize    : Binding<CGFloat>?    = nil,
-              flags       : Flags                = .defaultViewerFlags,
-              indentStyle : IndentStyle          = .system,
-              autoPairs   : [ String : String ]? = nil,
-              inset       : CGSize?              = nil)
+  public init(source           : String,
+              language         : Language?            = nil,
+              theme            : ThemeName            = .default,
+              fontSize         : Binding<CGFloat>?    = nil,
+              backgroundColor  : Binding<Color>?      = nil,
+              flags            : Flags                = .defaultViewerFlags,
+              indentStyle      : IndentStyle          = .system,
+              autoPairs        : [ String : String ]? = nil,
+              inset            : CGSize?              = nil)
   {
     assert(!flags.contains(.editable), "Editing requires a Binding")
-    self.init(source      : .constant(source),
-              language    : language,
-              theme       : theme,
-              fontSize    : fontSize,
-              flags       : flags.subtracting(.editable),
-              indentStyle : indentStyle,
-              autoPairs   : autoPairs,
-              inset       : inset)
+    self.init(source          : .constant(source),
+              language        : language,
+              theme           : theme,
+              fontSize        : fontSize,
+              backgroundColor : backgroundColor,
+              flags           : flags.subtracting(.editable),
+              indentStyle     : indentStyle,
+              autoPairs       : autoPairs,
+              inset           : inset)
   }
   
-  private var source      : Binding<String>
-  private var selection   : Binding<Range<String.Index>>?
-  private var fontSize    : Binding<CGFloat>?
-  private let language    : Language?
-  private let themeName   : ThemeName
-  private let flags       : Flags
-  private let indentStyle : IndentStyle
-  private let autoPairs   : [ String : String ]
-  private let inset       : CGSize
-  private let autoscroll  : Bool
+  private var source          : Binding<String>
+  private var selection       : Binding<Range<String.Index>>?
+  private var fontSize        : Binding<CGFloat>?
+  private var backgroundColor : Binding<Color>?
+  private let language        : Language?
+  private let themeName       : ThemeName
+  private let flags           : Flags
+  private let indentStyle     : IndentStyle
+  private let autoPairs       : [ String : String ]
+  private let inset           : CGSize
+  private let autoscroll      : Bool
 
   public var body: some View {
-    UXCodeTextViewRepresentable(source      : source,
-                                selection   : selection,
-                                language    : language,
-                                theme       : themeName,
-                                fontSize    : fontSize,
-                                flags       : flags,
-                                indentStyle : indentStyle,
-                                autoPairs   : autoPairs,
-                                inset       : inset,
-                                autoscroll  : autoscroll)
+    UXCodeTextViewRepresentable(source          : source,
+                                selection       : selection,
+                                language        : language,
+                                theme           : themeName,
+                                fontSize        : fontSize,
+                                backgroundColor : backgroundColor,
+                                flags           : flags,
+                                indentStyle     : indentStyle,
+                                autoPairs       : autoPairs,
+                                inset           : inset,
+                                autoscroll      : autoscroll)
   }
 }
 
