@@ -96,6 +96,8 @@ final class UXCodeTextView: UXTextView {
       isAutomaticDashSubstitutionEnabled   = false
       isAutomaticQuoteSubstitutionEnabled  = false
       usesRuler                            = false
+    #else
+      autocapitalizationType = .none
     #endif
   }
   required init?(coder: NSCoder) {
