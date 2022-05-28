@@ -8,25 +8,26 @@
 
 import SwiftUI
 
+// MARK: - TypedString
+
 /**
  * Simple helper to make typed strings.
  */
 public protocol TypedString: RawRepresentable, Hashable, Comparable, Codable,
-                             CustomStringConvertible,
-                             Identifiable
+    CustomStringConvertible,
+    Identifiable
 {
-  var rawValue: String { get }
+    var rawValue: String { get }
 }
 
 public extension TypedString where RawValue == String {
-  
-  @inlinable
-  var description : String { return self.rawValue }
-  @inlinable
-  var id          : String { return self.rawValue }
+    @inlinable
+    var description: String { rawValue }
+    @inlinable
+    var id: String { rawValue }
 
-  @inlinable
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    return lhs.rawValue < rhs.rawValue
-  }
+    @inlinable
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 }

@@ -6,8 +6,10 @@
 //  Copyright © 2021 ZeeZide GmbH. All rights reserved.
 //
 
-import SwiftUI
 import Highlightr
+import SwiftUI
+
+// MARK: - CodeEditor
 
 /**
  * An simple code editor (or viewer) with highlighting for SwiftUI (iOS and
@@ -145,207 +147,223 @@ import Highlightr
  * for its SVG and Swift editor parts.
  */
 public struct CodeEditor: View {
-  
-  /// Returns the available themes in the associated Highlightr package.
-  public static var availableThemes =
-    Highlightr()?.availableThemes().map(ThemeName.init).sorted() ?? []
-  
-  /// Returns the available languages in the associated Highlightr package.
-  public static var availableLanguages =
-    Highlightr()?.supportedLanguages().map(Language.init).sorted() ?? []
-  
+    // MARK: Lifecycle
 
-  /**
-   * Flags available for `CodeEditor`, currently just:
-   * - `.editable`
-   * - `.selectable`
-   */
-  @frozen public struct Flags: OptionSet {
-    public let rawValue : UInt8
-    @inlinable public init(rawValue: UInt8) { self.rawValue = rawValue }
-    
-    /// `.editable` requires that the `source` of the `CodeEditor` is a
-    /// `Binding`.
-    public static let editable   = Flags(rawValue: 1 << 0)
-    
-    /// Whether the displayed content should be selectable by the user.
-    public static let selectable = Flags(rawValue: 1 << 1)
-    
-    /// If the user starts a newline, the editor automagically adds the same
-    /// whitespace as on the previous line.
-    public static let smartIndent = Flags(rawValue: 1 << 2)
-    
-    public static let defaultViewerFlags : Flags = [ .selectable ]
-    public static let defaultEditorFlags : Flags =
-                        [ .selectable, .editable, .smartIndent ]
-  }
-  
-  @frozen public enum IndentStyle: Equatable {
-    case system
-    case softTab(width: Int)
-  }
-  
-  /**
-   * Default auto pairing mappings for languages.
-   */
-  public static var defaultAutoPairs : [ Language : [ String : String ] ] = [
-    .c: cStyleAutoPairs, .cpp: cStyleAutoPairs, .objectivec: cStyleAutoPairs,
-    .swift: cStyleAutoPairs,
-    .java: cStyleAutoPairs, .javascript: cStyleAutoPairs,
-    .xml: xmlStyleAutoPairs,
-    .python: [ "(": ")", "[": "]",  "\"": "\"",  "'": "'", "`": "`" ]
-  ]
-  public static var cStyleAutoPairs = [
-    "(": ")", "[": "]", "{": "}", "\"": "\"",  "'": "'", "`": "`"
-  ]
-  public static var xmlStyleAutoPairs = [ "<": ">", "\"": "\"", "'": "'" ]
+    /**
+     * Configures a CodeEditor View with the given parameters.
+     *
+     * - Parameters:
+     *   - source:      A binding to a String that holds the source code to be
+     *                  edited (or displayed).
+     *   - selection:   A binding to the selected range of the `source`.
+     *   - language:    Optionally set a language (e.g. `.swift`), otherwise
+     *                  Highlight.js will attempt to detect the language.
+     *   - theme:       The name of the theme to use, defaults to "pojoaque".
+     *   - fontSize:    On macOS this Binding can be used to persist the size of
+     *                  the font in use. At runtime this is combined with the
+     *                  theme to produce the full font information. (optional)
+     *   - flags:       Configure whether the text is editable and/or selectable
+     *                  (defaults to both).
+     *   - indentStyle: Optionally insert a configurable amount of spaces if the
+     *                  user hits "tab".
+     *   - autoPairs:   A mapping of open/close characters, where the close
+     *                  characters are automatically injected when the user enters
+     *                  the opening character. For example: `[ "{": "}" ]` would
+     *                  automatically insert the closing "}" if the user enters
+     *                  "{". If no value is given, the default mapping for the
+     *                  language is used.
+     *   - inset:       The editor can be inset in the scroll view. Defaults to
+     *                  8/8.
+     *   - autoscroll:  If enabled, the editor automatically scrolls to the respective
+     *                  region when the `selection` is changed programatically.
+     */
+    public init(
+        source: Binding<String>,
+        selection: Binding<Range<String.Index>>? = nil,
+        language: Language? = nil,
+        theme: ThemeName = .default,
+        fontSize: Binding<CGFloat>? = nil,
+        backgroundColor: Binding<Color>? = nil,
+        flags: Flags = .defaultEditorFlags,
+        indentStyle: IndentStyle = .system,
+        autoPairs: [String: String]? = nil,
+        inset: CGSize? = nil,
+        autoscroll: Bool = true
+    ) {
+        self.source = source
+        self.selection = selection
+        self.fontSize = fontSize
+        self.backgroundColor = backgroundColor
+        self.language = language
+        themeName = theme
+        self.flags = flags
+        self.indentStyle = indentStyle
+        self.inset = inset ?? CGSize(width: 8, height: 8)
+        self.autoPairs = autoPairs
+            ?? language.flatMap { CodeEditor.defaultAutoPairs[$0] }
+            ?? [:]
+        self.autoscroll = autoscroll
+    }
 
+    /**
+     * Configures a read-only CodeEditor View with the given parameters.
+     *
+     * - Parameters:
+     *   - source:      A String that holds the source code to be displayed.
+     *   - language:    Optionally set a language (e.g. `.swift`), otherwise
+     *                  Highlight.js will attempt to detect the language.
+     *   - theme:       The name of the theme to use, defaults to "pojoaque".
+     *   - fontSize:    On macOS this Binding can be used to persist the size of
+     *                  the font in use. At runtime this is combined with the
+     *                  theme to produce the full font information. (optional)
+     *   - flags:       Configure whether the text is selectable
+     *                  (defaults to both).
+     *   - indentStyle: Optionally insert a configurable amount of spaces if the
+     *                  user hits "tab".
+     *   - autoPairs:   A mapping of open/close characters, where the close
+     *                  characters are automatically injected when the user enters
+     *                  the opening character. For example: `[ "{": "}" ]` would
+     *                  automatically insert the closing "}" if the user enters
+     *                  "{". If no value is given, the default mapping for the
+     *                  language is used.
+     *   - inset:       The editor can be inset in the scroll view. Defaults to
+     *                  8/8.
+     */
+    @inlinable
+    public init(
+        source: String,
+        language: Language? = nil,
+        theme: ThemeName = .default,
+        fontSize: Binding<CGFloat>? = nil,
+        backgroundColor: Binding<Color>? = nil,
+        flags: Flags = .defaultViewerFlags,
+        indentStyle: IndentStyle = .system,
+        autoPairs: [String: String]? = nil,
+        inset: CGSize? = nil
+    ) {
+        assert(!flags.contains(.editable), "Editing requires a Binding")
+        self.init(
+            source: .constant(source),
+            language: language,
+            theme: theme,
+            fontSize: fontSize,
+            backgroundColor: backgroundColor,
+            flags: flags.subtracting(.editable),
+            indentStyle: indentStyle,
+            autoPairs: autoPairs,
+            inset: inset
+        )
+    }
 
-  /**
-   * Configures a CodeEditor View with the given parameters.
-   *
-   * - Parameters:
-   *   - source:      A binding to a String that holds the source code to be
-   *                  edited (or displayed).
-   *   - selection:   A binding to the selected range of the `source`.
-   *   - language:    Optionally set a language (e.g. `.swift`), otherwise
-   *                  Highlight.js will attempt to detect the language.
-   *   - theme:       The name of the theme to use, defaults to "pojoaque".
-   *   - fontSize:    On macOS this Binding can be used to persist the size of
-   *                  the font in use. At runtime this is combined with the
-   *                  theme to produce the full font information. (optional)
-   *   - flags:       Configure whether the text is editable and/or selectable
-   *                  (defaults to both).
-   *   - indentStyle: Optionally insert a configurable amount of spaces if the
-   *                  user hits "tab".
-   *   - autoPairs:   A mapping of open/close characters, where the close
-   *                  characters are automatically injected when the user enters
-   *                  the opening character. For example: `[ "{": "}" ]` would
-   *                  automatically insert the closing "}" if the user enters
-   *                  "{". If no value is given, the default mapping for the
-   *                  language is used.
-   *   - inset:       The editor can be inset in the scroll view. Defaults to
-   *                  8/8.
-   *   - autoscroll:  If enabled, the editor automatically scrolls to the respective
-   *                  region when the `selection` is changed programatically.
-   */
-  public init(source          : Binding<String>,
-              selection       : Binding<Range<String.Index>>? = nil,
-              language        : Language?            = nil,
-              theme           : ThemeName            = .default,
-              fontSize        : Binding<CGFloat>?    = nil,
-              backgroundColor : Binding<Color>?      = nil,
-              flags           : Flags                = .defaultEditorFlags,
-              indentStyle     : IndentStyle          = .system,
-              autoPairs       : [ String : String ]? = nil,
-              inset           : CGSize?              = nil,
-              autoscroll      : Bool                 = true)
-  {
-    self.source           = source
-    self.selection        = selection
-    self.fontSize         = fontSize
-    self.backgroundColor  = backgroundColor
-    self.language         = language
-    self.themeName        = theme
-    self.flags            = flags
-    self.indentStyle      = indentStyle
-    self.inset            = inset ?? CGSize(width: 8, height: 8)
-    self.autoPairs        = autoPairs
-                         ?? language.flatMap({ CodeEditor.defaultAutoPairs[$0] })
-                         ?? [:]
-    self.autoscroll = autoscroll
-  }
-  
-  /**
-   * Configures a read-only CodeEditor View with the given parameters.
-   *
-   * - Parameters:
-   *   - source:      A String that holds the source code to be displayed.
-   *   - language:    Optionally set a language (e.g. `.swift`), otherwise
-   *                  Highlight.js will attempt to detect the language.
-   *   - theme:       The name of the theme to use, defaults to "pojoaque".
-   *   - fontSize:    On macOS this Binding can be used to persist the size of
-   *                  the font in use. At runtime this is combined with the
-   *                  theme to produce the full font information. (optional)
-   *   - flags:       Configure whether the text is selectable
-   *                  (defaults to both).
-   *   - indentStyle: Optionally insert a configurable amount of spaces if the
-   *                  user hits "tab".
-   *   - autoPairs:   A mapping of open/close characters, where the close
-   *                  characters are automatically injected when the user enters
-   *                  the opening character. For example: `[ "{": "}" ]` would
-   *                  automatically insert the closing "}" if the user enters
-   *                  "{". If no value is given, the default mapping for the
-   *                  language is used.
-   *   - inset:       The editor can be inset in the scroll view. Defaults to
-   *                  8/8.
-   */
-  @inlinable
-  public init(source           : String,
-              language         : Language?            = nil,
-              theme            : ThemeName            = .default,
-              fontSize         : Binding<CGFloat>?    = nil,
-              backgroundColor  : Binding<Color>?      = nil,
-              flags            : Flags                = .defaultViewerFlags,
-              indentStyle      : IndentStyle          = .system,
-              autoPairs        : [ String : String ]? = nil,
-              inset            : CGSize?              = nil)
-  {
-    assert(!flags.contains(.editable), "Editing requires a Binding")
-    self.init(source          : .constant(source),
-              language        : language,
-              theme           : theme,
-              fontSize        : fontSize,
-              backgroundColor : backgroundColor,
-              flags           : flags.subtracting(.editable),
-              indentStyle     : indentStyle,
-              autoPairs       : autoPairs,
-              inset           : inset)
-  }
-  
-  private var source          : Binding<String>
-  private var selection       : Binding<Range<String.Index>>?
-  private var fontSize        : Binding<CGFloat>?
-  private var backgroundColor : Binding<Color>?
-  private let language        : Language?
-  private let themeName       : ThemeName
-  private let flags           : Flags
-  private let indentStyle     : IndentStyle
-  private let autoPairs       : [ String : String ]
-  private let inset           : CGSize
-  private let autoscroll      : Bool
+    // MARK: Public
 
-  public var body: some View {
-    UXCodeTextViewRepresentable(source          : source,
-                                selection       : selection,
-                                language        : language,
-                                theme           : themeName,
-                                fontSize        : fontSize,
-                                backgroundColor : backgroundColor,
-                                flags           : flags,
-                                indentStyle     : indentStyle,
-                                autoPairs       : autoPairs,
-                                inset           : inset,
-                                autoscroll      : autoscroll)
-  }
+    /**
+     * Flags available for `CodeEditor`, currently just:
+     * - `.editable`
+     * - `.selectable`
+     */
+    @frozen public struct Flags: OptionSet {
+        // MARK: Lifecycle
+
+        @inlinable public init(rawValue: UInt8) { self.rawValue = rawValue }
+
+        // MARK: Public
+
+        /// `.editable` requires that the `source` of the `CodeEditor` is a
+        /// `Binding`.
+        public static let editable = Flags(rawValue: 1 << 0)
+
+        /// Whether the displayed content should be selectable by the user.
+        public static let selectable = Flags(rawValue: 1 << 1)
+
+        /// If the user starts a newline, the editor automagically adds the same
+        /// whitespace as on the previous line.
+        public static let smartIndent = Flags(rawValue: 1 << 2)
+
+        public static let defaultViewerFlags: Flags = [.selectable]
+        public static let defaultEditorFlags: Flags =
+            [.selectable, .editable, .smartIndent]
+
+        public let rawValue: UInt8
+    }
+
+    @frozen public enum IndentStyle: Equatable {
+        case system
+        case softTab(width: Int)
+    }
+
+    /// Returns the available themes in the associated Highlightr package.
+    public static var availableThemes =
+        Highlightr()?.availableThemes().map(ThemeName.init).sorted() ?? []
+
+    /// Returns the available languages in the associated Highlightr package.
+    public static var availableLanguages =
+        Highlightr()?.supportedLanguages().map(Language.init).sorted() ?? []
+
+    /**
+     * Default auto pairing mappings for languages.
+     */
+    public static var defaultAutoPairs: [Language: [String: String]] = [
+        .c: cStyleAutoPairs, .cpp: cStyleAutoPairs, .objectivec: cStyleAutoPairs,
+        .swift: cStyleAutoPairs,
+        .java: cStyleAutoPairs, .javascript: cStyleAutoPairs,
+        .xml: xmlStyleAutoPairs,
+        .python: ["(": ")", "[": "]", "\"": "\"", "'": "'", "`": "`"],
+    ]
+    public static var cStyleAutoPairs = [
+        "(": ")", "[": "]", "{": "}", "\"": "\"", "'": "'", "`": "`",
+    ]
+    public static var xmlStyleAutoPairs = ["<": ">", "\"": "\"", "'": "'"]
+
+    public var body: some View {
+        UXCodeTextViewRepresentable(
+            source: source,
+            selection: selection,
+            language: language,
+            theme: themeName,
+            fontSize: fontSize,
+            backgroundColor: backgroundColor,
+            flags: flags,
+            indentStyle: indentStyle,
+            autoPairs: autoPairs,
+            inset: inset,
+            autoscroll: autoscroll
+        )
+    }
+
+    // MARK: Private
+
+    private var source: Binding<String>
+    private var selection: Binding<Range<String.Index>>?
+    private var fontSize: Binding<CGFloat>?
+    private var backgroundColor: Binding<Color>?
+    private let language: Language?
+    private let themeName: ThemeName
+    private let flags: Flags
+    private let indentStyle: IndentStyle
+    private let autoPairs: [String: String]
+    private let inset: CGSize
+    private let autoscroll: Bool
 }
 
+// MARK: - CodeEditor_Previews
+
 struct CodeEditor_Previews: PreviewProvider {
-  
-  static var previews: some View {
-    
-    CodeEditor(source: "let a = 5")
-      .frame(width: 200, height: 100)
-    
-    CodeEditor(source: "let a = 5", language: .swift, theme: .pojoaque)
-      .frame(width: 200, height: 100)
-    
-    CodeEditor(source:
-      #"""
-      The quadratic formula is $-b \pm \sqrt{b^2 - 4ac} \over 2a$
-      \bye
-      """#, language: .tex
-    )
-    .frame(width: 540, height: 200)
-  }
+    static var previews: some View {
+        CodeEditor(source: "let a = 5")
+            .frame(width: 200, height: 100)
+
+        CodeEditor(source: "let a = 5", language: .swift, theme: .pojoaque)
+            .frame(width: 200, height: 100)
+
+        CodeEditor(
+            source:
+            #"""
+            The quadratic formula is $-b \pm \sqrt{b^2 - 4ac} \over 2a$
+            \bye
+            """#,
+            language: .tex
+        )
+        .frame(width: 540, height: 200)
+    }
 }

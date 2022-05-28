@@ -3,22 +3,21 @@
 import PackageDescription
 
 let package = Package(
+    name: "CodeEditor",
 
-  name: "CodeEditor",
+    platforms: [
+        .macOS(.v11), .iOS(.v14),
+    ],
 
-  platforms: [
-    .macOS(.v11), .iOS(.v14)
-  ],
+    products: [
+        .library(name: "CodeEditor", targets: ["CodeEditor"]),
+    ],
 
-  products: [
-    .library(name: "CodeEditor", targets: [ "CodeEditor" ])
-  ],
+    dependencies: [
+        .package(url: "https://github.com/raspu/Highlightr", branch: "master"),
+    ],
 
-  dependencies: [
-    .package(url: "https://github.com/raspu/Highlightr", branch: "master")
-  ],
-
-  targets: [
-    .target(name: "CodeEditor", dependencies: [ "Highlightr" ])
-  ]
+    targets: [
+        .target(name: "CodeEditor", dependencies: ["Highlightr"]),
+    ]
 )
