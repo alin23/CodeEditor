@@ -98,6 +98,10 @@ final class UXCodeTextView: UXTextView {
       usesRuler                            = false
     #else
       autocapitalizationType = .none
+      autocorrectionType = .no
+      smartDashesType = .no
+      smartQuotesType = .no
+      smartInsertDeleteType = .no
     #endif
   }
   required init?(coder: NSCoder) {
